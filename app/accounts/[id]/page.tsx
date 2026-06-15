@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import ImportDropzone from "@/components/ImportDropzone";
 type Account = {
   id: string;
   firm: string;
@@ -139,6 +140,13 @@ export default function AccountDetailPage() {
             <button type="button" onClick={handleDelete} className="rounded-md border border-danger-bannerBorder bg-danger-bannerBg px-4 py-2 text-sm font-medium text-danger-fgLight hover:opacity-90 transition">Delete</button>
           </div>
         </form>
+
+        <div className="mt-8 pt-8 border-t border-border">
+          <h2 className="text-sm font-medium text-text-primary mb-3">
+            Import trades
+          </h2>
+          <ImportDropzone accountId={id} onImported={() => window.location.reload()} />
+        </div>
       </div>
     </main>
   );
