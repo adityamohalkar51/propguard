@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import AccountCard from "@/components/AccountCard";
 import BreachBanner from "@/components/BreachBanner";
 import { computeMetrics } from "@/lib/dashboardUtils";
+import { BookOpen } from "lucide-react";
 
 type Account = {
   id: string;
@@ -23,15 +24,10 @@ type Trade = {
   close_time: string;
 };
 
-type AccountWithMetrics = {
-  account: Account;
-  metrics: ReturnType<typeof computeMetrics>;
-};
-
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
-  const [items, setItems] = useState<AccountWithMetrics[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,7 +51,7 @@ export default function DashboardPage() {
       const accountList = (accounts as Account[]) ?? [];
       const tradeList = (trades as Trade[]) ?? [];
 
-      const result: AccountWithMetrics[] = accountList.map((acc) => {
+      const result = accountList.map((acc) => {
         const accTrades = tradeList
           .filter((t) => t.account_id === acc.id)
           .map((t) => ({ profit: t.profit, close_time: t.close_time }));
@@ -109,6 +105,10 @@ export default function DashboardPage() {
             <p className="text-sm text-text-secondary mt-1">{email}</p>
           </div>
           <div className="flex gap-3">
+            <a href="/journal" className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-card transition">
+              <BookOpen className="w-3.5 h-3.5" />
+              Trade Journal
+            </a>
             <a href="/accounts/new" className="rounded-md bg-accent-purple px-4 py-2 text-sm font-medium text-text-primary hover:opacity-90 transition">+ Add account</a>
             <button onClick={handleLogout} className="rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition">Log out</button>
           </div>
@@ -149,8 +149,8 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map(({ account, metrics }) => (
-              <AccountCard key={account.id} account={account} metrics={metrics} />
+            {items.map((item: any) => (
+              <AccountCard key={item.account.id} account={item.account} metrics={item.metrics} />
             ))}
           </div>
         )}
