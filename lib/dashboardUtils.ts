@@ -1,7 +1,5 @@
 ﻿import {
-  dailyLoss,
   dailyDDUsagePct,
-  maxDDLoss,
   maxDDUsagePct,
   targetProgressPct,
   getStatus,
