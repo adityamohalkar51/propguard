@@ -1,4 +1,4 @@
-// components/journal/TradeDetailModal.tsx
+﻿// components/journal/TradeDetailModal.tsx
 'use client';
 
 import React, { useState, useCallback } from 'react';
@@ -130,10 +130,10 @@ export default function TradeDetailModal({
         <div className="flex items-center justify-between p-4 border-b border-[#2C2C2A]">
           <div>
             <h3 className="text-[#F1EFE8] font-medium text-sm">
-              {trade.symbol || 'Unknown'} — {trade.side?.toUpperCase() || 'TRADE'}
+              {trade.symbol || 'Unknown'} â€” {trade.side?.toUpperCase() || 'TRADE'}
             </h3>
             <p className="text-[#5F5E5A] text-xs mt-0.5">
-              Ticket #{trade.ticket || 'N/A'} · {trade.lots} lots
+              Ticket #{trade.ticket || 'N/A'} Â· {trade.lots} lots
             </p>
           </div>
           <button
