@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "PropGuard Auto-Sync",
+  "version": "1.0",
+  "description": "Auto-sync trades from MT5 Web Terminal to PropGuard",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://*.mt5webterminal.com/*",
+    "https://*.metatraderweb.com/*",
+    "https://*.mql5.com/*",
+    "https://*.ftmo.com/*",
+    "https://*.fundednext.com/*",
+    "https://*.the5ers.com/*",
+    "https://propguard-nu.vercel.app/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.mt5webterminal.com/*",
+        "https://*.metatraderweb.com/*",
+        "https://*.mql5.com/*",
+        "https://*.ftmo.com/*",
+        "https://*.fundednext.com/*",
+        "https://*.the5ers.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

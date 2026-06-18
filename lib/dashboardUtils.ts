@@ -1,10 +1,8 @@
 ﻿import {
   dailyDDUsagePct,
-  maxDDUsagePct,
   targetProgressPct,
   getStatus,
   dailyDollarBuffer,
-  maxDollarBuffer,
 } from "./rules";
 
 export type Trade = {
@@ -38,20 +36,18 @@ export function computeMetrics(
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayTrades = trades.filter((t) => t.close_time.slice(0, 10) === todayStr);
   const todayPnl = todayTrades.reduce((sum, t) => sum + t.profit, 0);
-
   const dayStartValue = currentEquity - todayPnl;
 
-  const highestEquity = trades.reduce((max, t, i) => {
-    const eq = initialBalance + trades.slice(0, i + 1).reduce((s, x) => s + x.profit, 0);
-    return eq > max ? eq : max;
-  }, initialBalance);
+  // FTMO: Max Loss = loss from initial balance (simple)
+  const maxLossDollars = (maxDDPct / 100) * accountSize;
+  const currentLoss = initialBalance - currentEquity;
+  const maxUsage = currentLoss > 0 ? (currentLoss / maxLossDollars) * 100 : 0;
+  const maxBuffer = maxLossDollars - (currentLoss > 0 ? currentLoss : 0);
 
   const dailyUsage = dailyDDUsagePct(dayStartValue, currentEquity, accountSize, dailyDDPct);
-  const maxUsage = maxDDUsagePct(currentEquity, initialBalance, highestEquity, accountSize, maxDDPct, "static");
   const targetProgress = targetProgressPct(currentEquity, initialBalance, accountSize, targetPct);
   const status = getStatus(dailyUsage, maxUsage);
   const dailyBuffer = dailyDollarBuffer(dayStartValue, currentEquity, accountSize, dailyDDPct);
-  const maxBuffer = maxDollarBuffer(currentEquity, initialBalance, highestEquity, accountSize, maxDDPct, "static");
 
   return {
     dailyUsage,
