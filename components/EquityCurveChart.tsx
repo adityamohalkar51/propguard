@@ -15,6 +15,7 @@ interface ChartPoint {
   date: string
   equity: number
   label: string
+  fullDate: string
 }
 
 export default function EquityCurveChart({ trades, startingBalance }: EquityCurveChartProps) {
@@ -35,19 +36,32 @@ export default function EquityCurveChart({ trades, startingBalance }: EquityCurv
     {
       date: "start",
       equity: startingBalance,
-      label: "Start"
+      label: "Start",
+      fullDate: "Start"
     }
   ]
 
   for (const t of closedTrades) {
     running += t.profit || 0
     const d = new Date(t.close_time!)
+    const fullDate = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     data.push({
       date: t.close_time!,
       equity: Number(running.toFixed(2)),
-      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      fullDate
     })
   }
+
+  // Only show a label on the first point of each calendar day (avoids repeated tick labels)
+  const seenLabels = new Set<string>()
+  const tickData = data.map((d) => {
+    if (seenLabels.has(d.label)) {
+      return { ...d, label: "" }
+    }
+    seenLabels.add(d.label)
+    return d
+  })
 
   const equities = data.map(d => d.equity)
   const minEquity = Math.min(...equities, startingBalance)
@@ -75,7 +89,7 @@ export default function EquityCurveChart({ trades, startingBalance }: EquityCurv
       </div>
 
       <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={data} margin={{ top: 5, right: 8, bottom: 0, left: 0 }}>
+        <LineChart data={tickData} margin={{ top: 5, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2C2C2A" vertical={false} />
           <XAxis
             dataKey="label"
@@ -84,6 +98,7 @@ export default function EquityCurveChart({ trades, startingBalance }: EquityCurv
             tickLine={false}
             axisLine={{ stroke: "#2C2C2A" }}
             interval="preserveStartEnd"
+            minTickGap={24}
           />
           <YAxis
             domain={[minEquity - padding, maxEquity + padding]}
@@ -104,6 +119,10 @@ export default function EquityCurveChart({ trades, startingBalance }: EquityCurv
             labelStyle={{ color: "#888780" }}
             itemStyle={{ color: lineColor }}
             formatter={(value: number) => [`$${value.toFixed(2)}`, "Equity"]}
+            labelFormatter={(_label, payload) => {
+              const point = payload && payload[0] ? (payload[0].payload as ChartPoint) : null
+              return point ? point.fullDate : ""
+            }}
           />
           <Line
             type="monotone"
