@@ -1,9 +1,9 @@
-// app/journal/page.tsx
+﻿// app/journal/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/ssr';
 import { computeJournalStats } from '@/lib/journal';
 import CalendarView from '@/components/journal/CalendarView';
 import JournalStats from '@/components/journal/JournalStats';
@@ -27,6 +27,7 @@ interface Trade {
   mistakes?: string[] | null;
   setup_tags?: string[] | null;
   r_multiple?: number | null;
+  strategy_id?: string | null;
 }
 
 interface Account {
@@ -38,21 +39,35 @@ interface Account {
   created_at: string;
 }
 
+interface Strategy {
+  id: string;
+  name: string;
+  color: string;
+}
+
 type ViewMode = 'calendar' | 'list';
 
 export default function JournalPage() {
   const router = useRouter();
-  const [trades, setTrades] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [selectedAccount, setSelectedAccount] = useState('all');
+  const [selectedStrategy, setSelectedStrategy] = useState('all');
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [loading, setLoading] = useState(true);
-  const [selectedTrade, setSelectedTrade] = useState<any>(null);
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     checkAuth();
     fetchAccounts();
+    fetchStrategies();
   }, []);
 
   useEffect(() => {
@@ -84,6 +99,20 @@ export default function JournalPage() {
     setAccounts(data || []);
   };
 
+  const fetchStrategies = async () => {
+    const { data, error } = await supabase
+      .from('strategies')
+      .select('id, name, color')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching strategies:', error);
+      return;
+    }
+
+    setStrategies(data || []);
+  };
+
   const fetchTrades = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -94,7 +123,7 @@ export default function JournalPage() {
 
     let query = supabase
       .from('trades')
-      .select('id, account_id, ticket, symbol, side, open_time, close_time, lots, profit, created_at, notes, rating, mistakes, setup_tags, r_multiple')
+      .select('id, account_id, ticket, symbol, side, open_time, close_time, lots, profit, created_at, notes, rating, mistakes, setup_tags, r_multiple, strategy_id')
       .order('close_time', { ascending: false });
 
     if (selectedAccount !== 'all') {
@@ -113,20 +142,26 @@ export default function JournalPage() {
     setLoading(false);
   };
 
-  const handleTradeUpdate = useCallback((updatedTrade: any) => {
-    setTrades((prev: any) => prev.map((t: any) => t.id === updatedTrade.id ? updatedTrade : t));
+  const handleTradeUpdate = useCallback((updatedTrade: Trade) => {
+    setTrades((prev) => prev.map((t) => t.id === updatedTrade.id ? updatedTrade : t));
   }, []);
 
   const handleTradeDelete = useCallback((tradeId: string) => {
-    setTrades((prev: any) => prev.filter((t: any) => t.id !== tradeId));
+    setTrades((prev) => prev.filter((t) => t.id !== tradeId));
   }, []);
 
-  const stats = computeJournalStats(trades);
+  const filteredTrades = selectedStrategy === 'all'
+    ? trades
+    : selectedStrategy === 'none'
+      ? trades.filter((t) => !t.strategy_id)
+      : trades.filter((t) => t.strategy_id === selectedStrategy);
+
+  const stats = computeJournalStats(filteredTrades);
 
   return (
     <div className="min-h-screen bg-[#111110]">
       <header className="border-b border-[#2C2C2A] bg-[#1A1A18]">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/dashboard')}
@@ -142,16 +177,30 @@ export default function JournalPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
               className="bg-[#111110] border border-[#2C2C2A] rounded-lg px-3 py-1.5 text-xs text-[#F1EFE8] focus:border-[#534AB7] focus:outline-none"
             >
               <option value="all">All Accounts</option>
-              {accounts.map((acc: any) => (
+              {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
                   {acc.label || acc.firm} (${acc.account_size})
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedStrategy}
+              onChange={(e) => setSelectedStrategy(e.target.value)}
+              className="bg-[#111110] border border-[#2C2C2A] rounded-lg px-3 py-1.5 text-xs text-[#F1EFE8] focus:border-[#534AB7] focus:outline-none"
+            >
+              <option value="all">All Strategies</option>
+              <option value="none">No Strategy</option>
+              {strategies.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
             </select>
@@ -193,6 +242,14 @@ export default function JournalPage() {
               Go to Dashboard
             </button>
           </div>
+        ) : filteredTrades.length === 0 ? (
+          <div className="text-center py-20">
+            <BookOpen className="w-10 h-10 text-[#2C2C2A] mx-auto mb-3" />
+            <h3 className="text-[#F1EFE8] text-sm font-medium mb-1">No trades match this filter</h3>
+            <p className="text-[#5F5E5A] text-xs max-w-xs mx-auto">
+              Try a different strategy or account filter.
+            </p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 space-y-4">
@@ -202,13 +259,13 @@ export default function JournalPage() {
             <div className="lg:col-span-2">
               {viewMode === 'calendar' ? (
                 <CalendarView 
-                  trades={trades} 
+                  trades={filteredTrades} 
                   onDayClick={() => setViewMode('list')}
                 />
               ) : (
                 <TradeList 
-                  trades={trades} 
-                  onTradeClick={(trade: any) => {
+                  trades={filteredTrades} 
+                  onTradeClick={(trade: Trade) => {
                     setSelectedTrade(trade);
                     setIsModalOpen(true);
                   }}
