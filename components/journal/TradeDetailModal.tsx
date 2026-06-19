@@ -1,12 +1,13 @@
 ﻿// components/journal/TradeDetailModal.tsx
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { X, Save, Trash2 } from 'lucide-react';
 import StarRating from './StarRating';
 import MistakeTag from './MistakeTag';
 import { MISTAKE_OPTIONS, SETUP_OPTIONS } from '@/lib/journal';
-import { supabase } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/ssr';
+import StrategyBadge from '@/components/StrategyBadge';
 
 interface Trade {
   id: string;
@@ -26,6 +27,13 @@ interface Trade {
   r_multiple?: number | null;
   entry_screenshot_url?: string | null;
   exit_screenshot_url?: string | null;
+  strategy_id?: string | null;
+}
+
+interface Strategy {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface TradeDetailModalProps {
@@ -43,12 +51,30 @@ export default function TradeDetailModal({
   onUpdate,
   onDelete,
 }: TradeDetailModalProps) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
   const [notes, setNotes] = useState('');
   const [rating, setRating] = useState<number | null>(null);
   const [mistakes, setMistakes] = useState<string[]>([]);
   const [setups, setSetups] = useState<string[]>([]);
   const [rMultiple, setRMultiple] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [strategyId, setStrategyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadStrategies() {
+      const { data } = await supabase
+        .from('strategies')
+        .select('id, name, color')
+        .order('created_at', { ascending: true });
+      if (data) setStrategies(data);
+    }
+    if (isOpen) loadStrategies();
+  }, [isOpen]);
 
   React.useEffect(() => {
     if (trade) {
@@ -57,17 +83,18 @@ export default function TradeDetailModal({
       setMistakes(trade.mistakes || []);
       setSetups(trade.setup_tags || []);
       setRMultiple(trade.r_multiple?.toString() || '');
+      setStrategyId(trade.strategy_id || null);
     }
   }, [trade]);
 
   const toggleMistake = useCallback((m: string) => {
-    setMistakes(prev => 
+    setMistakes(prev =>
       prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]
     );
   }, []);
 
   const toggleSetup = useCallback((s: string) => {
-    setSetups(prev => 
+    setSetups(prev =>
       prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
     );
   }, []);
@@ -84,6 +111,7 @@ export default function TradeDetailModal({
         mistakes: mistakes.length > 0 ? mistakes : null,
         setup_tags: setups.length > 0 ? setups : null,
         r_multiple: rMultiple ? parseFloat(rMultiple) : null,
+        strategy_id: strategyId || null,
       })
       .eq('id', trade.id)
       .select()
@@ -121,7 +149,7 @@ export default function TradeDetailModal({
   if (!isOpen || !trade) return null;
 
   const profitClass = (trade.profit || 0) >= 0 ? 'text-[#1D9E75]' : 'text-[#E24B4A]';
-  const isWin = (trade.profit || 0) > 0;
+  const selectedStrategy = strategies.find(s => s.id === strategyId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -130,16 +158,13 @@ export default function TradeDetailModal({
         <div className="flex items-center justify-between p-4 border-b border-[#2C2C2A]">
           <div>
             <h3 className="text-[#F1EFE8] font-medium text-sm">
-              {trade.symbol || 'Unknown'} â€” {trade.side?.toUpperCase() || 'TRADE'}
+              {trade.symbol || 'Unknown'} - {trade.side?.toUpperCase() || 'TRADE'}
             </h3>
             <p className="text-[#5F5E5A] text-xs mt-0.5">
-              Ticket #{trade.ticket || 'N/A'} Â· {trade.lots} lots
+              Ticket #{trade.ticket || 'N/A'} · {trade.lots} lots
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-[#5F5E5A] hover:text-[#F1EFE8] transition-colors"
-          >
+          <button onClick={onClose} className="text-[#5F5E5A] hover:text-[#F1EFE8] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -177,6 +202,40 @@ export default function TradeDetailModal({
           </div>
         </div>
 
+        {/* Strategy */}
+        <div className="p-4 border-b border-[#2C2C2A]">
+          <label className="text-[#5F5E5A] uppercase tracking-wider text-[10px] block mb-2">
+            Strategy
+          </label>
+          {strategies.length === 0 ? (
+            <a href="/strategies" target="_blank" className="text-[#534AB7] text-xs hover:underline">
+              + Create your first strategy →
+            </a>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setStrategyId(null)}
+                className={`px-2.5 py-1 rounded text-xs border transition-colors ${
+                  strategyId === null
+                    ? 'border-[#534AB7] bg-[#534AB7]/20 text-[#AFA9EC]'
+                    : 'border-[#2C2C2A] text-[#888780] hover:border-[#534AB7]'
+                }`}
+              >
+                None
+              </button>
+              {strategies.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setStrategyId(s.id)}
+                  className={`transition-opacity ${strategyId === s.id ? 'opacity-100' : 'opacity-50 hover:opacity-80'}`}
+                >
+                  <StrategyBadge name={s.name} color={s.color} small />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Rating */}
         <div className="p-4 border-b border-[#2C2C2A]">
           <label className="text-[#5F5E5A] uppercase tracking-wider text-[10px] block mb-2">
@@ -188,7 +247,7 @@ export default function TradeDetailModal({
         {/* Setup Tags */}
         <div className="p-4 border-b border-[#2C2C2A]">
           <label className="text-[#5F5E5A] uppercase tracking-wider text-[10px] block mb-2">
-            Setup / Strategy
+            Setup / Pattern
           </label>
           <div className="flex flex-wrap gap-1.5">
             {SETUP_OPTIONS.map(setup => (

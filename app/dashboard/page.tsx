@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import AccountCard from "@/components/AccountCard";
 import BreachBanner from "@/components/BreachBanner";
 import { computeMetrics } from "@/lib/dashboardUtils";
-import { BookOpen } from "lucide-react";
+import { BookOpen, LayoutList } from "lucide-react";
 
 type Account = {
   id: string;
@@ -108,6 +108,10 @@ export default function DashboardPage() {
             <a href="/journal" className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-card transition">
               <BookOpen className="w-3.5 h-3.5" />
               Trade Journal
+            </a>
+            <a href="/strategies" className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-card transition">
+              <LayoutList className="w-3.5 h-3.5" />
+              Strategies
             </a>
             <a href="/accounts/new" className="rounded-md bg-accent-purple px-4 py-2 text-sm font-medium text-text-primary hover:opacity-90 transition">+ Add account</a>
             <button onClick={handleLogout} className="rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition">Log out</button>
