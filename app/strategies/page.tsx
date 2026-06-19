@@ -1,7 +1,7 @@
 ﻿"use client"
 import { useEffect, useState } from "react"
 import { createBrowserClient } from "@supabase/ssr"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import StrategyBadge from "@/components/StrategyBadge"
 
@@ -22,6 +22,7 @@ const COLORS = [
 ]
 
 export default function StrategiesPage() {
+  const router = useRouter()
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -68,7 +69,8 @@ export default function StrategiesPage() {
     setShowForm(true)
   }
 
-  function openEdit(s: Strategy) {
+  function openEdit(s: Strategy, e: React.MouseEvent) {
+    e.stopPropagation()
     setEditTarget(s)
     setForm({ name: s.name, description: s.description ?? "", color: s.color })
     setShowForm(true)
@@ -105,16 +107,21 @@ export default function StrategiesPage() {
     load()
   }
 
+  function handleDeleteClick(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setDeleteId(id)
+  }
+
   return (
     <div className="min-h-screen bg-[#111110] text-[#F1EFE8]">
       <div className="max-w-4xl mx-auto px-6 py-10">
-        <Link
-          href="/dashboard"
+        <button
+          onClick={() => router.push("/dashboard")}
           className="inline-flex items-center gap-1.5 text-[#888780] hover:text-[#F1EFE8] text-sm mb-6 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to Dashboard
-        </Link>
+        </button>
 
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -144,14 +151,15 @@ export default function StrategiesPage() {
               return (
                 <div
                   key={s.id}
-                  className="bg-[#1A1A18] border border-[#2C2C2A] rounded-xl p-5"
+                  onClick={() => router.push(`/strategies/${s.id}`)}
+                  className="bg-[#1A1A18] border border-[#2C2C2A] rounded-xl p-5 cursor-pointer hover:border-[#534AB7]/50 transition-colors"
                   style={{ borderLeftColor: s.color, borderLeftWidth: 3 }}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <StrategyBadge name={s.name} color={s.color} />
                     <div className="flex gap-2">
-                      <button onClick={() => openEdit(s)} className="text-[#888780] hover:text-[#F1EFE8] text-xs transition-colors">Edit</button>
-                      <button onClick={() => setDeleteId(s.id)} className="text-[#888780] hover:text-[#E24B4A] text-xs transition-colors">Delete</button>
+                      <button onClick={(e) => openEdit(s, e)} className="text-[#888780] hover:text-[#F1EFE8] text-xs transition-colors">Edit</button>
+                      <button onClick={(e) => handleDeleteClick(s.id, e)} className="text-[#888780] hover:text-[#E24B4A] text-xs transition-colors">Delete</button>
                     </div>
                   </div>
                   {s.description && (
@@ -189,8 +197,8 @@ export default function StrategiesPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1A1A18] border border-[#2C2C2A] rounded-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={() => setShowForm(false)}>
+          <div className="bg-[#1A1A18] border border-[#2C2C2A] rounded-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-base font-medium mb-5">{editTarget ? "Edit Strategy" : "New Strategy"}</h2>
             <div className="space-y-4">
               <div>
@@ -237,8 +245,8 @@ export default function StrategiesPage() {
       )}
 
       {deleteId && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1A1A18] border border-[#2C2C2A] rounded-xl w-full max-w-sm p-6 text-center">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={() => setDeleteId(null)}>
+          <div className="bg-[#1A1A18] border border-[#2C2C2A] rounded-xl w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="text-3xl mb-3">⚠️</div>
             <h3 className="text-base font-medium mb-2">Delete Strategy?</h3>
             <p className="text-[#888780] text-sm mb-6">Trades tagged with this strategy will be untagged. This cannot be undone.</p>
