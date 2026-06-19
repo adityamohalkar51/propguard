@@ -1,4 +1,4 @@
-// lib/journal.ts
+﻿// lib/journal.ts
 // NO external import — all types defined here
 
 export interface Trade {
@@ -19,6 +19,7 @@ export interface Trade {
   r_multiple?: number | null;
   entry_screenshot_url?: string | null;
   exit_screenshot_url?: string | null;
+  strategy_id?: string | null;
 }
 
 export interface JournalEntry {
@@ -275,4 +276,60 @@ export function getRatingColor(rating: number): string {
   if (rating >= 4) return 'text-[#1D9E75]';
   if (rating >= 3) return 'text-[#EF9F27]';
   return 'text-[#E24B4A]';
+}
+
+function csvEscape(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function exportTradesToCSV(
+  trades: Trade[],
+  strategyMap: Map<string, string>
+): void {
+  const headers = [
+    'Symbol',
+    'Side',
+    'Open Time',
+    'Close Time',
+    'Lots',
+    'Profit',
+    'R Multiple',
+    'Rating',
+    'Strategy',
+    'Setup Tags',
+    'Mistakes',
+    'Notes',
+  ];
+
+  const rows = trades.map((t) => [
+    csvEscape(t.symbol),
+    csvEscape(t.side?.toUpperCase()),
+    csvEscape(t.open_time ? new Date(t.open_time).toLocaleString() : ''),
+    csvEscape(t.close_time ? new Date(t.close_time).toLocaleString() : ''),
+    csvEscape(t.lots),
+    csvEscape(t.profit?.toFixed(2)),
+    csvEscape(t.r_multiple),
+    csvEscape(t.rating),
+    csvEscape(t.strategy_id ? strategyMap.get(t.strategy_id) || '' : ''),
+    csvEscape((t.setup_tags || []).join('; ')),
+    csvEscape((t.mistakes || []).join('; ')),
+    csvEscape(t.notes),
+  ]);
+
+  const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const dateStr = new Date().toISOString().split('T')[0];
+  link.setAttribute('download', `propguard-trades-${dateStr}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

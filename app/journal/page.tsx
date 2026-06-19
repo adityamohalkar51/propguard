@@ -4,12 +4,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { computeJournalStats } from '@/lib/journal';
+import { computeJournalStats, exportTradesToCSV } from '@/lib/journal';
 import CalendarView from '@/components/journal/CalendarView';
 import JournalStats from '@/components/journal/JournalStats';
 import TradeList from '@/components/journal/TradeList';
 import TradeDetailModal from '@/components/journal/TradeDetailModal';
-import { BookOpen, LayoutGrid, List, ChevronLeft, Loader2 } from 'lucide-react';
+import { BookOpen, LayoutGrid, List, ChevronLeft, Loader2, Download } from 'lucide-react';
 
 interface Trade {
   id: string;
@@ -158,6 +158,13 @@ export default function JournalPage() {
 
   const stats = computeJournalStats(filteredTrades);
 
+  const strategyMap = new Map(strategies.map((s) => [s.id, s.name]));
+
+  const handleExport = () => {
+    if (filteredTrades.length === 0) return;
+    exportTradesToCSV(filteredTrades, strategyMap);
+  };
+
   return (
     <div className="min-h-screen bg-[#111110]">
       <header className="border-b border-[#2C2C2A] bg-[#1A1A18]">
@@ -204,6 +211,16 @@ export default function JournalPage() {
                 </option>
               ))}
             </select>
+
+            <button
+              onClick={handleExport}
+              disabled={filteredTrades.length === 0}
+              title="Export filtered trades to CSV"
+              className="flex items-center gap-1.5 bg-[#111110] border border-[#2C2C2A] hover:border-[#534AB7] rounded-lg px-3 py-1.5 text-xs text-[#F1EFE8] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV
+            </button>
 
             <div className="flex bg-[#111110] border border-[#2C2C2A] rounded-lg p-0.5">
               <button
