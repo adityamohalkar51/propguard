@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import ImportDropzone from "@/components/ImportDropzone";
+import EquityCurveChart from "@/components/EquityCurveChart";
+
 type Account = {
   id: string;
   firm: string;
@@ -15,26 +17,44 @@ type Account = {
   phase: string;
   start_date: string | null;
 };
+
+type Trade = {
+  close_time: string | null;
+  profit: number;
+};
+
 export default function AccountDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
   const [account, setAccount] = useState<Account | null>(null);
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const loadData = async () => {
+    const { data, error } = await supabase.from("accounts").select("*").eq("id", id).single();
+    if (error || !data) {
+      router.push("/dashboard");
+      return;
+    }
+    setAccount(data as Account);
+
+    const { data: tradeData } = await supabase
+      .from("trades")
+      .select("close_time, profit")
+      .eq("account_id", id)
+      .order("close_time", { ascending: true });
+
+    setTrades(tradeData ?? []);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const load = async () => {
-      const { data, error } = await supabase.from("accounts").select("*").eq("id", id).single();
-      if (error || !data) {
-        router.push("/dashboard");
-        return;
-      }
-      setAccount(data as Account);
-      setLoading(false);
-    };
-    load();
-  }, [id, router]);
+    loadData();
+  }, [id]);
+
   const handleChange = (field: keyof Account, value: string) => {
     if (!account) return;
     setAccount({ ...account, [field]: value });
@@ -86,6 +106,11 @@ export default function AccountDetailPage() {
           <a href="/dashboard" className="text-sm text-text-secondary hover:text-text-primary transition">Back to dashboard</a>
           <h1 className="text-2xl font-medium text-text-primary mt-4">Edit account</h1>
         </div>
+
+        <div className="mb-8">
+          <EquityCurveChart trades={trades} startingBalance={Number(account.account_size)} />
+        </div>
+
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="label-text mb-2 block">Firm</label>
@@ -145,7 +170,7 @@ export default function AccountDetailPage() {
           <h2 className="text-sm font-medium text-text-primary mb-3">
             Import trades
           </h2>
-          <ImportDropzone accountId={id} onImported={() => window.location.reload()} />
+          <ImportDropzone accountId={id} onImported={loadData} />
         </div>
       </div>
     </main>
