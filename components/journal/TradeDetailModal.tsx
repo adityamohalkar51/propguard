@@ -1,8 +1,8 @@
 ﻿// components/journal/TradeDetailModal.tsx
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { X, Save, Trash2 } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { X, Save, Trash2, Upload, ImageOff } from 'lucide-react';
 import StarRating from './StarRating';
 import MistakeTag from './MistakeTag';
 import { MISTAKE_OPTIONS, SETUP_OPTIONS } from '@/lib/journal';
@@ -44,6 +44,8 @@ interface TradeDetailModalProps {
   onDelete?: (tradeId: string) => void;
 }
 
+type ScreenshotKind = 'entry' | 'exit';
+
 export default function TradeDetailModal({
   trade,
   isOpen,
@@ -65,6 +67,13 @@ export default function TradeDetailModal({
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [strategyId, setStrategyId] = useState<string | null>(null);
 
+  const [entryUrl, setEntryUrl] = useState<string | null>(null);
+  const [exitUrl, setExitUrl] = useState<string | null>(null);
+  const [uploadingEntry, setUploadingEntry] = useState(false);
+  const [uploadingExit, setUploadingExit] = useState(false);
+  const entryInputRef = useRef<HTMLInputElement>(null);
+  const exitInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     async function loadStrategies() {
       const { data } = await supabase
@@ -84,6 +93,8 @@ export default function TradeDetailModal({
       setSetups(trade.setup_tags || []);
       setRMultiple(trade.r_multiple?.toString() || '');
       setStrategyId(trade.strategy_id || null);
+      setEntryUrl(trade.entry_screenshot_url || null);
+      setExitUrl(trade.exit_screenshot_url || null);
     }
   }, [trade]);
 
@@ -98,6 +109,70 @@ export default function TradeDetailModal({
       prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
     );
   }, []);
+
+  const handleScreenshotUpload = async (kind: ScreenshotKind, file: File) => {
+    if (!trade) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file.');
+      return;
+    }
+
+    const setUploading = kind === 'entry' ? setUploadingEntry : setUploadingExit;
+    const setUrl = kind === 'entry' ? setEntryUrl : setExitUrl;
+
+    setUploading(true);
+
+    const ext = file.name.split('.').pop();
+    const path = `${trade.account_id}/${trade.id}-${kind}-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('trade-screenshots')
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      alert('Error uploading: ' + uploadError.message);
+      setUploading(false);
+      return;
+    }
+
+    const { data: publicData } = supabase.storage
+      .from('trade-screenshots')
+      .getPublicUrl(path);
+
+    const column = kind === 'entry' ? 'entry_screenshot_url' : 'exit_screenshot_url';
+
+    const { error: dbError } = await supabase
+      .from('trades')
+      .update({ [column]: publicData.publicUrl })
+      .eq('id', trade.id);
+
+    setUploading(false);
+
+    if (dbError) {
+      alert('Error saving screenshot: ' + dbError.message);
+      return;
+    }
+
+    setUrl(publicData.publicUrl);
+  };
+
+  const handleScreenshotRemove = async (kind: ScreenshotKind) => {
+    if (!trade) return;
+    const column = kind === 'entry' ? 'entry_screenshot_url' : 'exit_screenshot_url';
+    const setUrl = kind === 'entry' ? setEntryUrl : setExitUrl;
+
+    const { error } = await supabase
+      .from('trades')
+      .update({ [column]: null })
+      .eq('id', trade.id);
+
+    if (error) {
+      alert('Error removing screenshot: ' + error.message);
+      return;
+    }
+
+    setUrl(null);
+  };
 
   const handleSave = async () => {
     if (!trade) return;
@@ -124,7 +199,7 @@ export default function TradeDetailModal({
       return;
     }
 
-    onUpdate(data as Trade);
+    onUpdate({ ...(data as Trade), entry_screenshot_url: entryUrl, exit_screenshot_url: exitUrl });
     onClose();
   };
 
@@ -149,7 +224,57 @@ export default function TradeDetailModal({
   if (!isOpen || !trade) return null;
 
   const profitClass = (trade.profit || 0) >= 0 ? 'text-[#1D9E75]' : 'text-[#E24B4A]';
-  const selectedStrategy = strategies.find(s => s.id === strategyId);
+
+  const renderScreenshotBox = (kind: ScreenshotKind) => {
+    const url = kind === 'entry' ? entryUrl : exitUrl;
+    const uploading = kind === 'entry' ? uploadingEntry : uploadingExit;
+    const inputRef = kind === 'entry' ? entryInputRef : exitInputRef;
+    const label = kind === 'entry' ? 'Entry' : 'Exit';
+
+    return (
+      <div>
+        <span className="text-[#5F5E5A] uppercase tracking-wider text-[10px] block mb-1.5">
+          {label} Screenshot
+        </span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleScreenshotUpload(kind, file);
+            e.target.value = '';
+          }}
+        />
+        {url ? (
+          <div className="relative group">
+            <img
+              src={url}
+              alt={`${label} screenshot`}
+              className="w-full h-28 object-cover rounded-lg border border-[#2C2C2A] cursor-pointer"
+              onClick={() => window.open(url, '_blank')}
+            />
+            <button
+              onClick={() => handleScreenshotRemove(kind)}
+              className="absolute top-1.5 right-1.5 bg-[#111110]/90 hover:bg-[#501313] text-[#E24B4A] rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ImageOff className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="w-full h-28 border border-dashed border-[#2C2C2A] hover:border-[#534AB7] rounded-lg flex flex-col items-center justify-center gap-1.5 text-[#5F5E5A] hover:text-[#888780] transition-colors disabled:opacity-50"
+          >
+            <Upload className="w-4 h-4" />
+            <span className="text-[10px]">{uploading ? 'Uploading...' : 'Upload image'}</span>
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -200,6 +325,12 @@ export default function TradeDetailModal({
               className="w-full bg-[#111110] border border-[#2C2C2A] rounded px-2 py-1 mt-0.5 text-[#F1EFE8] font-mono text-xs focus:border-[#534AB7] focus:outline-none"
             />
           </div>
+        </div>
+
+        {/* Screenshots */}
+        <div className="p-4 grid grid-cols-2 gap-3 border-b border-[#2C2C2A]">
+          {renderScreenshotBox('entry')}
+          {renderScreenshotBox('exit')}
         </div>
 
         {/* Strategy */}
